@@ -594,9 +594,11 @@ function computeChanges() {
   );
   function stageTx(date, asset, action, units, amount) {
     const key = `${date}|${asset}|${Math.abs(units).toFixed(4)}|${Math.abs(amount).toFixed(2)}`;
+    // Only skip rows that already exist in the sheet — do NOT add to the set here,
+    // because KBank legitimately places two identical orders on the same date
+    // (same fund, same amount, same units) and both must be written.
     const dup = existingTxKeys.has(key);
     changes.txAdd.push({ date, asset, action, units: Math.abs(units), amount: Math.abs(amount), dup });
-    if (!dup) existingTxKeys.add(key); // prevent same-session duplicate staging
   }
 
   if (type === 'set_trades') {
