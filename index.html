@@ -124,7 +124,7 @@ tr:last-child td{border-bottom:none}
   <ol>
     <li>Go to <code>console.cloud.google.com</code> → create a project</li>
     <li>APIs &amp; Services → Library → enable <code>Google Sheets API</code> and <code>Google Picker API</code></li>
-    <li>APIs &amp; Services → OAuth consent screen → External → fill basic info → add scope <code>.../auth/drive.file</code> → add yourself as a test user</li>
+    <li>APIs &amp; Services → OAuth consent screen → External → fill basic info → add scope <code>.../auth/spreadsheets</code> → add yourself as a test user</li>
     <li>APIs &amp; Services → Credentials → Create OAuth client ID → Web application → add this page's URL under Authorized JavaScript origins</li>
     <li>Credentials → Create API key (restrict to Picker API)</li>
     <li>Paste both values below, then reload this page</li>
@@ -203,7 +203,7 @@ tr:last-child td{border-bottom:none}
 /* ───────────────────────── CONFIG ───────────────────────── */
 let GOOGLE_CLIENT_ID = localStorage.getItem('ft_client_id') || 'YOUR_CLIENT_ID.apps.googleusercontent.com';
 let GOOGLE_API_KEY   = localStorage.getItem('ft_api_key')   || 'YOUR_API_KEY';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 const TABS = { tx:'Transactions', div:'Dividends', assets:'Assets' };
 
 const needsSetup = GOOGLE_CLIENT_ID.includes('YOUR_') || GOOGLE_API_KEY.includes('YOUR_');
