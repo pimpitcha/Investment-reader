@@ -607,20 +607,25 @@ function computeChanges() {
 
   if (type === 'kbank_fund') {
     const assetsByCode = {};
-    state.sheetData.assets.forEach((r, idx) => { assetsByCode[r[0]] = { rowIndex: idx + 2, row: r }; });
+    state.sheetData.assets.forEach((r, idx) => { if (r[0]) assetsByCode[r[0]] = { rowIndex: idx + 2, row: r }; });
+
+    // Strip parenthesized suffix from parser fund codes to match sheet format:
+    // K-CHINA-A(D) → K-CHINA-A, K-CBOND-A → K-CBOND-A, K-WPBALANCED → K-WPBALANCED
+    function normalizeCode(code) { return code.replace(/\([^)]*\)$/, '').trim(); }
 
     for (const f of data) {
+      const sheetCode = normalizeCode(f.fund_code);
       for (const tx of f.transactions) {
-        if (tx.type === 'purchase' || tx.type === 'switch_in') stageTx(tx.date, f.fund_code, 'BUY', tx.units_change, tx.amount_thb);
-        else if (tx.type === 'redemption' || tx.type === 'switch_out') stageTx(tx.date, f.fund_code, 'SELL', tx.units_change, tx.amount_thb);
+        if (tx.type === 'purchase' || tx.type === 'switch_in') stageTx(tx.date, sheetCode, 'BUY', tx.units_change, tx.amount_thb);
+        else if (tx.type === 'redemption' || tx.type === 'switch_out') stageTx(tx.date, sheetCode, 'SELL', tx.units_change, tx.amount_thb);
       }
       if (f.ending_value_thb != null && f.ending_units != null && f.ending_units > 0) {
-        const existing = assetsByCode[f.fund_code];
+        const existing = assetsByCode[sheetCode];
         const navPerUnit = f.ending_value_thb / f.ending_units;
         if (existing) {
-          changes.assetUpdate.push({ fund_code: f.fund_code, rowIndex: existing.rowIndex, nav: navPerUnit, date: f.ending_date });
+          changes.assetUpdate.push({ fund_code: sheetCode, rowIndex: existing.rowIndex, nav: navPerUnit, date: f.ending_date });
         } else {
-          changes.assetNew.push({ fund_code: f.fund_code, fund_name: f.fund_name, nav: navPerUnit, date: f.ending_date });
+          changes.assetNew.push({ fund_code: sheetCode, fund_name: f.fund_name, nav: navPerUnit, date: f.ending_date });
         }
       }
     }
