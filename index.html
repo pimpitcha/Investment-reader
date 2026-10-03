@@ -1,1 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finance Tracker Connector</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f3f2;--surface:#fff;--border:#d4dbd8;--text:#1a2422;--muted:#5a706b;
+  --accent:#0b5c45;--accent-l:#e2f3ec;--danger:#b83030;--danger-l:#fdf0f0;
+  --warn:#7a5200;--warn-l:#fff8e6;--info-l:#eaf3fb;--info:#154e72;
+  --buy:#0b5c45;--sell:#b83030;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#131a18;--surface:#1c2523;--border:#2e3e3a;--text:#d8e8e4;--muted:#7a9690;
+  --accent-l:#0a2e23;--danger-l:#2e1010;--warn-l:#2a2010;--info-l:#0e2030}
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:15px;line-height:1.55;padding:calc(env(safe-area-inset-top,0px) + 24px) 18px calc(env(safe-area-inset-bottom,0px) + 40px);
+  max-width:720px;margin:0 auto}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--accent);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.eyebrow::before{content:'';width:18px;height:2px;background:var(--accent);border-radius:1px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.3px;margin-bottom:4px}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:24px}
+h2{font-size:15px;font-weight:600;margin-bottom:4px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+  background:var(--border);color:var(--muted);font-size:11px;font-weight:700;margin-right:8px;flex-shrink:0}
+.step-num.done{background:var(--accent);color:#fff}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+.card.dim{opacity:.45;pointer-events:none}
+.card-head{display:flex;align-items:center;margin-bottom:10px}
+.card-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px;margin-left:28px}
 
+/* buttons */
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:600;
+  cursor:pointer;transition:opacity .15s;-webkit-appearance:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.88}
+.btn-primary:disabled{background:var(--border);color:var(--muted);cursor:not-allowed}
+.btn-ghost{background:none;border:1.5px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1}
+
+/* setup banner */
+.setup-banner{background:var(--warn-l);border:1px solid #e6c866;border-radius:10px;padding:16px;margin-bottom:20px}
+.setup-banner h3{font-size:14px;color:var(--warn);margin-bottom:8px}
+.setup-banner ol{margin-left:18px;font-size:13px;color:var(--text);line-height:1.8}
+.setup-banner code{background:var(--surface);padding:1px 5px;border-radius:4px;font-size:12px;font-family:Menlo,monospace}
+.cfg-row{display:flex;gap:8px;margin-top:10px}
+.cfg-row input{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;
+  font-family:Menlo,monospace;background:var(--surface);color:var(--text)}
+
+/* connect status */
+.conn-status{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--accent-l);
+  border-radius:8px;font-size:13px;color:var(--accent);margin-bottom:10px}
+.conn-status .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+/* drop zone (reused) */
+.drop-zone{position:relative;border:1.5px dashed var(--border);border-radius:10px;padding:24px 16px;
+  text-align:center;cursor:pointer;background:var(--surface);transition:border-color .15s}
+.drop-zone:hover{border-color:var(--accent)}
+.drop-zone input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.drop-zone.has-file{border-style:solid;border-color:var(--accent);background:var(--accent-l)}
+.drop-icon{font-size:26px;display:block;margin-bottom:6px}
+.drop-primary{font-size:14px;font-weight:500}
+.drop-secondary{font-size:12px;color:var(--muted);margin-top:2px}
+.input-row{display:flex;gap:8px;margin-top:10px}
+input[type=password],input[type=text]{flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
+  background:var(--surface);color:var(--text);font-size:14px;outline:none}
+input:focus{border-color:var(--accent)}
+.ghost-btn{padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);
+  color:var(--muted);font-size:12px;font-weight:500;cursor:pointer}
+
+/* banners */
+.banner{display:none;border-radius:8px;padding:11px 14px;font-size:13px;margin-bottom:14px;line-height:1.5}
+.banner.show{display:block}
+.banner.err{background:var(--danger-l);color:var(--danger)}
+.banner.ok{background:var(--accent-l);color:var(--accent)}
+.banner.info{background:var(--info-l);color:var(--info)}
+.banner.warn{background:var(--warn-l);color:var(--warn)}
+
+/* review */
+.section-label{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;
+  margin:18px 0 8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 8px;text-align:center}
+.stat-n{font-size:18px;font-weight:600;color:var(--accent);display:block;line-height:1.1}
+.stat-l{font-size:10.5px;color:var(--muted);margin-top:3px}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:10px;
+  margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:460px}
+th{padding:8px 10px;background:var(--bg);font-size:10.5px;font-weight:600;letter-spacing:.03em;color:var(--muted);
+  text-align:left;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-family:Menlo,monospace}
+.t-buy{color:var(--buy);font-weight:500}.t-sell{color:var(--sell);font-weight:500}
+.t-skip{color:var(--muted);text-decoration:line-through}
+.t-new{color:var(--accent);font-weight:600}
+.badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:99px;font-weight:600}
+.badge-new{background:var(--accent-l);color:var(--accent)}
+.badge-dup{background:var(--border);color:var(--muted)}
+.badge-upd{background:var(--info-l);color:var(--info)}
+.badge-miss{background:var(--warn-l);color:var(--warn)}
+.divider{height:1px;background:var(--border);margin:28px 0}
+.hint{font-size:12px;color:var(--muted)}
+#progressLog{font-family:Menlo,monospace;font-size:11.5px;line-height:1.7;max-height:200px;overflow-y:auto}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="eyebrow">PERSONAL BUILD</div>
+<h1>Finance Tracker<br>Connector</h1>
+<p class="subtitle">Upload a statement, review what changes, write it to your own Sheet.</p>
+
+<div class="setup-banner" id="setupBanner" style="display:none">
+  <h3>⚠ One-time setup needed</h3>
+  <ol>
+    <li>Go to <code>console.cloud.google.com</code> → create a project</li>
+    <li>APIs &amp; Services → Library → enable <code>Google Sheets API</code> and <code>Google Picker API</code></li>
+    <li>APIs &amp; Services → OAuth consent screen → External → fill basic info → add scope <code>.../auth/drive.file</code> → add yourself as a test user</li>
+    <li>APIs &amp; Services → Credentials → Create OAuth client ID → Web application → add this page's URL under Authorized JavaScript origins</li>
+    <li>Credentials → Create API key (restrict to Picker API)</li>
+    <li>Paste both values below, then reload this page</li>
+  </ol>
+  <div class="cfg-row">
+    <input type="text" id="cfgClientId" placeholder="OAuth Client ID">
+  </div>
+  <div class="cfg-row">
+    <input type="text" id="cfgApiKey" placeholder="API Key">
+  </div>
+  <button class="btn btn-primary" style="margin-top:10px" id="saveCfgBtn">Save &amp; reload</button>
+</div>
+
+<!-- STEP 1: CONNECT -->
+<div class="card" id="connectCard">
+  <div class="card-head"><span class="step-num" id="step1num">1</span><h2>Connect your Sheet</h2></div>
+  <div class="card-sub">You'll pick the exact file — nothing else in your Drive is touched.</div>
+  <div class="conn-status" id="connStatus" style="display:none">
+    <span class="dot"></span><span id="connStatusText"></span>
+  </div>
+  <button class="btn btn-primary" id="connectBtn">Connect Google Sheet</button>
+  <div class="banner" id="connectBanner"></div>
+</div>
+
+<!-- STEP 2: UPLOAD -->
+<div class="card dim" id="uploadCard">
+  <div class="card-head"><span class="step-num" id="step2num">2</span><h2>Upload statement</h2></div>
+  <div class="card-sub">PDF is read on your device only.</div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" accept=".pdf,application/pdf" id="fileInput">
+    <span class="drop-icon" id="dropIcon">📄</span>
+    <div class="drop-primary" id="dropPrimary">Tap to choose a PDF</div>
+    <div class="drop-secondary" id="dropSecondary">KBank fund · SET trades · SET dividends</div>
+  </div>
+  <div class="input-row">
+    <input type="password" id="pwInput" placeholder="Password (if any)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <button class="ghost-btn" id="togglePw">Show</button>
+  </div>
+  <button class="btn btn-primary" id="processBtn" style="margin-top:12px" disabled>Read &amp; parse statement</button>
+  <div class="banner" id="processBanner"></div>
+  <details style="margin-top:10px">
+    <summary class="hint" style="cursor:pointer">Raw extracted text (debug)</summary>
+    <pre id="rawTextOut" style="font-size:11px;background:var(--bg);padding:10px;border-radius:6px;margin-top:6px;
+      max-height:200px;overflow-y:auto;white-space:pre-wrap"></pre>
+  </details>
+</div>
+
+<!-- STEP 3: REVIEW -->
+<div class="card dim" id="reviewCard">
+  <div class="card-head"><span class="step-num" id="step3num">3</span><h2>Review changes</h2></div>
+  <div class="card-sub">Nothing is written until you confirm below.</div>
+  <div id="reviewBody"></div>
+  <button class="btn btn-primary" id="writeBtn" style="display:none;margin-top:6px" disabled>Write to Sheet</button>
+  <div class="banner" id="writeBanner"></div>
+  <div id="progressLog" style="display:none;margin-top:10px"></div>
+</div>
+
+<!-- STEP 4: RESULT -->
+<div class="card" id="resultCard" style="display:none">
+  <div class="card-head"><span class="step-num done">✓</span><h2>Done</h2></div>
+  <div id="resultBody"></div>
+  <button class="btn btn-ghost" id="anotherBtn" style="margin-top:12px">Process another statement</button>
+</div>
+
+<div class="divider"></div>
+<p class="hint" style="text-align:center">Statements and your OAuth token stay in this browser. Only the rows shown in Review are sent to Google Sheets.</p>
+
+<!-- Google scripts: not allowed inside a published Claude artifact's CSP — this file is meant to be
+     self-hosted (GitHub Pages, Cloudflare Pages, etc), where these load normally. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+'use strict';
+
+/* ───────────────────────── CONFIG ───────────────────────── */
+let GOOGLE_CLIENT_ID = localStorage.getItem('ft_client_id') || 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+let GOOGLE_API_KEY   = localStorage.getItem('ft_api_key')   || 'YOUR_API_KEY';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const TABS = { tx:'Transactions', div:'Dividends', assets:'Assets' };
+
+const needsSetup = GOOGLE_CLIENT_ID.includes('YOUR_') || GOOGLE_API_KEY.includes('YOUR_');
+if (needsSetup) {
+  document.getElementById('setupBanner').style.display = 'block';
+  document.getElementById('connectCard').classList.add('dim');
+}
+document.getElementById('saveCfgBtn').addEventListener('click', function () {
+  const cid = document.getElementById('cfgClientId').value.trim();
+  const key = document.getElementById('cfgApiKey').value.trim();
+  if (!cid || !key) { alert('Both fields are required.'); return; }
+  localStorage.setItem('ft_client_id', cid);
+  localStorage.setItem('ft_api_key', key);
+  location.reload();
+});
+
+/* ───────────────────────── STATE ───────────────────────── */
+const state = {
+  accessToken: null,
+  spreadsheetId: null,
+  spreadsheetTitle: null,
+  sheetData: { tx: [], div: [], assets: [] },   // raw row arrays, row 2 = index 0
+  parsed: null,       // { type: 'kbank_fund'|'set_trades'|'set_dividends', data: [...] }
+  changes: null,      // computed diff, see computeChanges()
+  tokenClient: null,
+  pickerLoaded: false
+};
+
+/* ───────────────────────── UTIL ───────────────────────── */
+const parseNum = s => parseFloat(String(s).replace(/,/g, ''));
+const fmtN = (n, d=2) => n == null || isNaN(n) ? '—' : n.toLocaleString('en', { minimumFractionDigits:d, maximumFractionDigits:d });
+const fmtD = iso => { if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+const toISO = (d,m,y) => `${y}-${m}-${d}`;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function showBanner(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.className = 'banner show ' + type;
+}
+function hideBanner(id) { document.getElementById(id).className = 'banner'; }
+function log(msg) {
+  const el = document.getElementById('progressLog');
+  el.style.display = 'block';
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+function markStepDone(n) { document.getElementById('step'+n+'num').classList.add('done'); document.getElementById('step'+n+'num').textContent='✓'; }
+function enableCard(id) { document.getElementById(id).classList.remove('dim'); }
+
+/* ───────────────────────── GOOGLE AUTH + PICKER ───────────────────────── */
+function initGoogle() {
+  if (needsSetup) return;
+  if (!window.google || !google.accounts) { setTimeout(initGoogle, 300); return; }
+  state.tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: onTokenResponse
+  });
+}
+window.addEventListener('load', () => { if (!needsSetup) { initGoogle(); gapi.load('picker', () => { state.pickerLoaded = true; }); } });
+
+document.getElementById('connectBtn').addEventListener('click', function () {
+  if (!state.tokenClient) { showBanner('connectBanner', 'Google sign-in is still loading — try again in a second.', 'err'); return; }
+  hideBanner('connectBanner');
+  state.tokenClient.requestAccessToken({ prompt: '' });
+});
+
+function onTokenResponse(resp) {
+  if (resp.error) {
+    showBanner('connectBanner', 'Sign-in failed: ' + resp.error, 'err');
+    return;
+  }
+  state.accessToken = resp.access_token;
+  openPicker();
+}
+
+function openPicker() {
+  if (!state.pickerLoaded) { showBanner('connectBanner', 'Picker still loading — tap Connect again.', 'err'); return; }
+  const view = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+    .setMode(google.picker.DocsViewMode.LIST);
+  const picker = new google.picker.PickerBuilder()
+    .addView(view)
+    .setOAuthToken(state.accessToken)
+    .setDeveloperKey(GOOGLE_API_KEY)
+    .setCallback(onPickerResult)
+    .build();
+  picker.setVisible(true);
+}
+
+function onPickerResult(data) {
+  if (data.action !== google.picker.Action.PICKED) return;
+  const doc = data.docs[0];
+  state.spreadsheetId = doc.id;
+  state.spreadsheetTitle = doc.name;
+  showBanner('connectBanner', 'Loading sheet data…', 'info');
+  fetchSheetData().then(() => {
+    hideBanner('connectBanner');
+    document.getElementById('connStatus').style.display = 'flex';
+    document.getElementById('connStatusText').textContent = 'Connected: ' + state.spreadsheetTitle;
+    document.getElementById('connectBtn').textContent = 'Reconnect / choose different sheet';
+    markStepDone(1);
+    enableCard('uploadCard');
+  }).catch(err => {
+    showBanner('connectBanner', 'Could not read sheet: ' + err.message, 'err');
+  });
+}
+
+/* ───────────────────────── SHEETS API ───────────────────────── */
+async function sheetsFetch(path, options = {}) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${state.spreadsheetId}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: { 'Authorization': 'Bearer ' + state.accessToken, 'Content-Type': 'application/json', ...(options.headers||{}) }
+  });
+  if (res.status === 401) throw new Error('Google sign-in expired — tap Connect again.');
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Sheets API error ${res.status}: ${body.slice(0,200)}`);
+  }
+  return res.json();
+}
+
+async function fetchSheetData() {
+  const ranges = [`${TABS.tx}!A2:G`, `${TABS.div}!A2:K`, `${TABS.assets}!A2:V`]
+    .map(r => 'ranges=' + encodeURIComponent(r)).join('&');
+  const data = await sheetsFetch(`/values:batchGet?${ranges}`);
+  const vr = data.valueRanges || [];
+  state.sheetData.tx      = (vr[0] && vr[0].values) || [];
+  state.sheetData.div     = (vr[1] && vr[1].values) || [];
+  state.sheetData.assets  = (vr[2] && vr[2].values) || [];
+}
+
+/* ───────────────────────── PDF EXTRACTION (unchanged, tested) ───────────────────────── */
+let selectedFile = null, extractedText = '';
+const dropZone=document.getElementById('dropZone'), fileInput=document.getElementById('fileInput'),
+  processBtn=document.getElementById('processBtn'), pwInput=document.getElementById('pwInput'),
+  togglePw=document.getElementById('togglePw');
+const pdfLibReady = typeof pdfjsLib !== 'undefined';
+if (pdfLibReady) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+fileInput.addEventListener('change', function () {
+  const file = fileInput.files[0]; if (!file) return;
+  selectedFile = file;
+  dropZone.classList.add('has-file');
+  document.getElementById('dropIcon').textContent = '✅';
+  document.getElementById('dropPrimary').textContent = file.name;
+  document.getElementById('dropSecondary').textContent = (file.size/1024).toFixed(0) + ' KB';
+  processBtn.disabled = false;
+  hideBanner('processBanner');
+  document.getElementById('reviewCard').classList.add('dim');
+  document.getElementById('writeBtn').style.display = 'none';
+});
+togglePw.addEventListener('click', function () {
+  if (pwInput.type === 'password') { pwInput.type='text'; togglePw.textContent='Hide'; }
+  else { pwInput.type='password'; togglePw.textContent='Show'; }
+});
+function readAsBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+async function extractText(file, password) {
+  if (!pdfLibReady) throw new Error('PDF library did not load — check your connection and reload.');
+  const buffer = await readAsBuffer(file);
+  const opts = { data: new Uint8Array(buffer) };
+  if (password) opts.password = password;
+  let pdf;
+  try { pdf = await pdfjsLib.getDocument(opts).promise; }
+  catch (err) {
+    if (err.name === 'PasswordException') {
+      throw new Error(err.code === 1 ? 'This PDF needs a password.' : 'Incorrect password.');
+    }
+    throw err;
+  }
+  let fullText = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    let lastY = null, pageText = '';
+    for (const item of content.items) {
+      if (!Object.prototype.hasOwnProperty.call(item, 'str')) continue;
+      const y = item.transform ? item.transform[5] : null;
+      if (lastY !== null && y !== null && Math.abs(y - lastY) > 3) pageText += '\n';
+      pageText += item.str;
+      if (item.hasEOL) pageText += '\n';
+      if (y !== null) lastY = y;
+    }
+    fullText += `\n${'─'.repeat(34)}\nPAGE ${p}\n${'─'.repeat(34)}\n${pageText.trim()}\n`;
+  }
+  return fullText;
+}
+
+/* ───────────────────────── PARSERS (unchanged, tested) ───────────────────────── */
+function parseKBankFund(text) {
+  const lines = text.split('\n').map(l => l.trim());
+  const funds = {};
+  const DATE_RE=/^(\d{2})\/(\d{2})\/(\d{4})$/, FUND_RE=/Fund Code\s*:\s*([^\s(]+)/,
+    ACCT_RE=/Mutual Fund Account no\.\s*:\s*(\S+)/, NUM_RE=/^-?[\d,]+\.\d+$/;
+  const TX_MAP={'Beginning Balance':'beginning_balance','Purchase':'purchase','Redemption':'redemption',
+    'Switch In':'switch_in','Switch Out':'switch_out','Ending Balance':'ending_balance'};
+  const CHANNELS=['K-Cyber/ K-My Funds','K PLUS','K-Mobile Banking Plus'];
+  let currentFund=null;
+  let i=0;
+  while (i<lines.length) {
+    const line=lines[i];
+    const fm=line.match(FUND_RE);
+    if (fm) {
+      currentFund=fm[1];
+      if (!funds[currentFund]) {
+        const nameM=line.match(/\(([^)]+)\)/);
+        funds[currentFund]={fund_code:currentFund,fund_name:nameM?nameM[1]:'',account_no:null,
+          transactions:[],ending_value_thb:null,ending_units:null};
+      }
+    }
+    const am=line.match(ACCT_RE);
+    if (am && currentFund && !funds[currentFund].account_no) funds[currentFund].account_no=am[1];
+    const dm=line.match(DATE_RE);
+    if (dm && currentFund) {
+      const date=toISO(dm[1],dm[2],dm[3]);
+      let j=i+1; const block=[];
+      while (j<lines.length) {
+        const bl=lines[j];
+        if (bl.match(DATE_RE)) break;
+        if (bl.charCodeAt(0)===0x2500 && bl.length>=10) break;
+        if (/^PAGE \d+$/.test(bl)) break;
+        block.push(bl); j++;
+      }
+      let txType=null;
+      for (const b of block) if (TX_MAP[b]) { txType=TX_MAP[b]; break; }
+      if (txType) {
+        const nums=block.filter(b=>b && NUM_RE.test(b)).map(parseNum);
+        const channel=block.find(b=>CHANNELS.some(c=>b.includes(c)))||null;
+        const tx={date,type:txType,fund_code:currentFund};
+        if (txType==='beginning_balance') tx.opening_units=nums[0]??null;
+        else if (txType==='ending_balance') {
+          tx.ending_value_thb=nums[0]??null; tx.ending_units=nums[1]??null;
+          funds[currentFund].ending_value_thb=tx.ending_value_thb;
+          funds[currentFund].ending_units=tx.ending_units;
+          funds[currentFund].ending_date=date;
+        } else {
+          tx.price_per_unit=nums[0]??null; tx.amount_thb=nums[1]??null;
+          tx.units_change=nums[2]??null; tx.channel=channel;
+        }
+        funds[currentFund].transactions.push(tx);
+      }
+      i=j; continue;
+    }
+    i++;
+  }
+  for (const f of Object.values(funds)) {
+    const beg=f.transactions.find(t=>t.type==='beginning_balance');
+    const end=f.transactions.find(t=>t.type==='ending_balance');
+    let verified=null;
+    if (beg!=null && end!=null) {
+      const open=beg.opening_units??0;
+      const sumDelta=f.transactions.filter(t=>['purchase','redemption','switch_in','switch_out'].includes(t.type))
+        .reduce((s,t)=>s+(t.units_change??0),0);
+      verified=Math.abs(Math.round((open+sumDelta)*10000)/10000 - (end.ending_units??0))<0.01;
+    }
+    f.balance_verified=verified;
+  }
+  return Object.values(funds);
+}
+
+function parseSETTrades(text) {
+  const lines=text.split('\n').map(l=>l.trim());
+  const trades=[];
+  const TRADE_RE=/^(\d{2}\/\d{2}\/\d{4})\s+([A-Z0-9]+)\s+(BUY|SELL)\s+([\d,]+\.[\d,]+)\s+([\d,]+\.\d{2})$/;
+  let accountNo=null;
+  for (const line of lines) {
+    const am=line.match(/เลขบัญชี[^:]*:\s*(\d+[-–]\d+)/);
+    if (am) { accountNo=am[1]; continue; }
+    const m=line.match(TRADE_RE);
+    if (!m) continue;
+    const [,dateStr,symbol,action,priceVol,netStr]=m;
+    const combined=priceVol.replace(/,/g,'');
+    const pm=combined.match(/^(\d+\.\d{2})/);
+    if (!pm) continue;
+    const price=parseFloat(pm[1]);
+    const volume=parseInt(combined.slice(pm[1].length).replace(/,/g,''),10)||0;
+    const net=parseNum(netStr);
+    const [d,mo,y]=dateStr.split('/');
+    trades.push({date:toISO(d,mo,y),symbol,action:action.toLowerCase(),price,volume,net_thb:net,account_no:accountNo});
+  }
+  return trades;
+}
+
+function parseSETDividends(text) {
+  const lines=text.split('\n').map(l=>l.trim());
+  const dividends=[];
+  const ROW_RE=/^\d{1,2}$/, TAXID_RE=/^0\d{12}$/, SYM_RE=/^[A-Z][A-Z0-9]{1,7}$/,
+    DATE_RE=/^(\d{2})\/(\d{2})\/(\d{4})$/, NUM_RE=/^[\d,]+\.\d+$/;
+  const dashOrNum=s=>(s==='-'||!s)?0:parseNum(s);
+  let i=0;
+  while (i<lines.length) {
+    const line=lines[i];
+    if (!ROW_RE.test(line)) { i++; continue; }
+    let j=i+1; while (j<lines.length && lines[j]==='') j++;
+    if (j>=lines.length || !TAXID_RE.test(lines[j])) { i++; continue; }
+    const rowNum=parseInt(line,10); const taxId=lines[j]; j++;
+    while (j<lines.length && lines[j]==='') j++;
+    if (j>=lines.length || !SYM_RE.test(lines[j])) { i++; continue; }
+    const symbol=lines[j]; j++;
+    while (j<lines.length && lines[j]==='') j++;
+    if (j>=lines.length || !lines[j].match(DATE_RE)) { i++; continue; }
+    const dateStr=lines[j]; j++;
+    const [,dd,mm,yyyy]=dateStr.match(DATE_RE);
+    const tokens=[];
+    while (j<lines.length) {
+      const bl=lines[j];
+      if (bl.includes('รวมเงินปันผล')||bl.includes('End of Report')) break;
+      if (ROW_RE.test(bl)) {
+        let k=j+1; while (k<lines.length && lines[k]==='') k++;
+        if (k<lines.length && TAXID_RE.test(lines[k])) break;
+      }
+      if (bl==='-'||NUM_RE.test(bl)) tokens.push(bl);
+      j++;
+    }
+    if (tokens.length>=5) {
+      const t=tokens.slice(-5);
+      dividends.push({row:rowNum,symbol,date:toISO(dd,mm,yyyy),payer_tax_id:taxId,
+        total_thb:dashOrNum(t[0]),tax_thb:dashOrNum(t[1]),net_thb:dashOrNum(t[2]),
+        not_receive_credit_thb:dashOrNum(t[3]),tax_exempt_thb:dashOrNum(t[4])});
+    }
+    i=j;
+  }
+  return dividends;
+}
+
+function detectSource(text) {
+  if (text.includes('Fund Code') && text.includes('Mutual Fund Account')) return 'kbank_fund';
+  if (text.includes('Buy/Sell') || text.includes('บัญชีแคชบาลานซ์')) return 'set_trades';
+  if (text.includes('Withholding Tax') || text.includes('TSD System')) return 'set_dividends';
+  return null;
+}
+
+/* ───────────────────────── PROCESS BUTTON ───────────────────────── */
+processBtn.addEventListener('click', async function () {
+  if (!selectedFile) return;
+  processBtn.disabled = true;
+  hideBanner('processBanner');
+  try {
+    showBanner('processBanner', 'Reading PDF…', 'info');
+    extractedText = await extractText(selectedFile, pwInput.value);
+    document.getElementById('rawTextOut').textContent = extractedText;
+
+    const srcType = detectSource(extractedText);
+    if (!srcType) throw new Error('Could not recognize this statement type (not KBank fund, SET trades, or SET dividends).');
+
+    let data;
+    if (srcType === 'kbank_fund') data = parseKBankFund(extractedText);
+    else if (srcType === 'set_trades') data = parseSETTrades(extractedText);
+    else data = parseSETDividends(extractedText);
+
+    if (!data.length) throw new Error('Recognized the format but found no rows to import.');
+
+    state.parsed = { type: srcType, data };
+    showBanner('processBanner', `Parsed ${data.length} ${srcType === 'kbank_fund' ? 'fund(s)' : 'row(s)'}. Computing changes…`, 'ok');
+
+    computeChanges();
+    renderReview();
+    markStepDone(2);
+    enableCard('reviewCard');
+    document.getElementById('writeBtn').style.display = 'block';
+    document.getElementById('writeBtn').disabled = false;
+
+  } catch (err) {
+    console.error(err);
+    showBanner('processBanner', err.message, 'err');
+  }
+  processBtn.disabled = false;
+});
+
+/* ───────────────────────── COMPUTE CHANGES ───────────────────────── */
+function computeChanges() {
+  const { type, data } = state.parsed;
+  const changes = { txAdd: [], divMatch: [], divUnmatched: [], assetNew: [], assetUpdate: [] };
+
+  // existing Transactions keys for dedupe: date|asset|units|amount
+  // Sheets API returns numeric cells as strings and preserves thousands separators
+  // (e.g. "6,000.00"), so both fields must strip commas before parseFloat — plain
+  // parseFloat("6,000.00") silently truncates to 6, which breaks the dedupe match.
+  const sheetNum = v => parseFloat(String(v || '0').replace(/,/g, ''));
+  const existingTxKeys = new Set(
+    state.sheetData.tx.map(r => `${r[0]}|${r[1]}|${sheetNum(r[3]).toFixed(4)}|${sheetNum(r[4]).toFixed(2)}`)
+  );
+  function stageTx(date, asset, action, units, amount) {
+    const key = `${date}|${asset}|${Math.abs(units).toFixed(4)}|${Math.abs(amount).toFixed(2)}`;
+    const dup = existingTxKeys.has(key);
+    changes.txAdd.push({ date, asset, action, units: Math.abs(units), amount: Math.abs(amount), dup });
+    if (!dup) existingTxKeys.add(key); // prevent same-session duplicate staging
+  }
+
+  if (type === 'set_trades') {
+    for (const t of data) stageTx(t.date, t.symbol, t.action.toUpperCase(), t.volume, t.net_thb);
+  }
+
+  if (type === 'kbank_fund') {
+    const assetsByCode = {};
+    state.sheetData.assets.forEach((r, idx) => { assetsByCode[r[0]] = { rowIndex: idx + 2, row: r }; });
+
+    for (const f of data) {
+      for (const tx of f.transactions) {
+        if (tx.type === 'purchase' || tx.type === 'switch_in') stageTx(tx.date, f.fund_code, 'BUY', tx.units_change, tx.amount_thb);
+        else if (tx.type === 'redemption' || tx.type === 'switch_out') stageTx(tx.date, f.fund_code, 'SELL', tx.units_change, tx.amount_thb);
+      }
+      if (f.ending_value_thb != null && f.ending_units != null && f.ending_units > 0) {
+        const existing = assetsByCode[f.fund_code];
+        const navPerUnit = f.ending_value_thb / f.ending_units;
+        if (existing) {
+          changes.assetUpdate.push({ fund_code: f.fund_code, rowIndex: existing.rowIndex, nav: navPerUnit, date: f.ending_date });
+        } else {
+          changes.assetNew.push({ fund_code: f.fund_code, fund_name: f.fund_name, nav: navPerUnit, date: f.ending_date });
+        }
+      }
+    }
+  }
+
+  if (type === 'set_dividends') {
+    // group existing dividend rows by symbol, only those with empty column H (index 7)
+    const candidates = {};
+    state.sheetData.div.forEach((r, idx) => {
+      const sym = r[1], received = r[7];
+      if (!received || received === '') {
+        (candidates[sym] = candidates[sym] || []).push({ rowIndex: idx + 2, exDate: r[0], year: r[9] });
+      }
+    });
+    const claimed = new Set();
+    for (const d of data) {
+      const year = String(d.date.slice(0,4));
+      const pool = (candidates[d.symbol] || []).filter(c => c.year === year && !claimed.has(c.rowIndex));
+      if (!pool.length) { changes.divUnmatched.push(d); continue; }
+      // nearest ex-date to payment date
+      const paymentMs = new Date(d.date).getTime();
+      pool.sort((a,b) => Math.abs(new Date(a.exDate)-paymentMs) - Math.abs(new Date(b.exDate)-paymentMs));
+      const best = pool[0];
+      claimed.add(best.rowIndex);
+      changes.divMatch.push({ symbol: d.symbol, paymentDate: d.date, exDate: best.exDate, rowIndex: best.rowIndex, net: d.net_thb, gross: d.total_thb });
+    }
+  }
+
+  state.changes = changes;
+}
+
+/* ───────────────────────── RENDER REVIEW ───────────────────────── */
+function renderReview() {
+  const c = state.changes;
+  const body = document.getElementById('reviewBody');
+  let html = '';
+
+  if (c.txAdd.length) {
+    const newCount = c.txAdd.filter(t=>!t.dup).length, dupCount = c.txAdd.length - newCount;
+    html += `<div class="stats">
+      <div class="stat"><span class="stat-n">${newCount}</span><span class="stat-l">New transactions</span></div>
+      <div class="stat"><span class="stat-n">${dupCount}</span><span class="stat-l">Already in sheet</span></div>
+      <div class="stat"><span class="stat-n">${c.assetNew.length + c.assetUpdate.length}</span><span class="stat-l">Asset rows affected</span></div>
+    </div>`;
+    html += `<div class="section-label">Transactions (${c.txAdd.length})</div><div class="tbl-wrap"><table>
+      <thead><tr><th>Date</th><th>Asset</th><th>Action</th><th class="num">Units</th><th class="num">Amount</th><th></th></tr></thead><tbody>`;
+    for (const t of c.txAdd) {
+      const cls = t.dup ? 't-skip' : (t.action==='BUY'?'t-buy':'t-sell');
+      html += `<tr><td>${fmtD(t.date)}</td><td>${esc(t.asset)}</td><td class="${cls}">${t.action}</td>
+        <td class="num">${fmtN(t.units,4)}</td><td class="num">${fmtN(t.amount)}</td>
+        <td>${t.dup?'<span class="badge badge-dup">skip</span>':'<span class="badge badge-new">new</span>'}</td></tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+
+  if (c.assetNew.length || c.assetUpdate.length) {
+    html += `<div class="section-label">Assets (${c.assetNew.length + c.assetUpdate.length})</div><div class="tbl-wrap"><table>
+      <thead><tr><th>Fund</th><th>Action</th><th class="num">NAV/unit</th><th>As of</th></tr></thead><tbody>`;
+    for (const a of c.assetNew) html += `<tr><td>${esc(a.fund_code)}</td><td><span class="badge badge-new">create</span></td>
+      <td class="num">${fmtN(a.nav,4)}</td><td>${fmtD(a.date)}</td></tr>`;
+    for (const a of c.assetUpdate) html += `<tr><td>${esc(a.fund_code)}</td><td><span class="badge badge-upd">update NAV</span></td>
+      <td class="num">${fmtN(a.nav,4)}</td><td>${fmtD(a.date)}</td></tr>`;
+    html += `</tbody></table></div>`;
+    html += `<p class="hint" style="margin-bottom:10px">New funds get a price only — run <b>Refresh All</b> in your sheet afterward to compute cost basis.</p>`;
+  }
+
+  if (c.divMatch.length || c.divUnmatched.length) {
+    html += `<div class="section-label">Dividends (${c.divMatch.length + c.divUnmatched.length})</div><div class="tbl-wrap"><table>
+      <thead><tr><th>Symbol</th><th>Payment date</th><th>Matched to</th><th class="num">Net received</th><th></th></tr></thead><tbody>`;
+    for (const d of c.divMatch) html += `<tr><td>${esc(d.symbol)}</td><td>${fmtD(d.paymentDate)}</td>
+      <td>${fmtD(d.exDate)}</td><td class="num">${fmtN(d.net)}</td><td><span class="badge badge-new">fill H</span></td></tr>`;
+    for (const d of c.divUnmatched) html += `<tr><td>${esc(d.symbol)}</td><td>${fmtD(d.date)}</td>
+      <td>—</td><td class="num">${fmtN(d.net_thb)}</td><td><span class="badge badge-miss">no match</span></td></tr>`;
+    html += `</tbody></table></div>`;
+    if (c.divUnmatched.length) html += `<p class="hint" style="margin-bottom:10px">Rows marked "no match" aren't in your Dividends tab yet — add them manually, they're skipped here.</p>`;
+  }
+
+  if (!html) html = `<p class="hint">Nothing new to write — every row already exists in your sheet.</p>`;
+  body.innerHTML = html;
+}
+
+/* ───────────────────────── WRITE TO SHEET ───────────────────────── */
+document.getElementById('writeBtn').addEventListener('click', async function () {
+  const btn = this;
+  btn.disabled = true;
+  hideBanner('writeBanner');
+  document.getElementById('progressLog').textContent = '';
+  const c = state.changes;
+  let written = { tx: 0, divs: 0, assetsNew: 0, assetsUpdated: 0 };
+
+  try {
+    const newTx = c.txAdd.filter(t => !t.dup);
+    if (newTx.length) {
+      log(`Writing ${newTx.length} transaction row(s)…`);
+      await sheetsFetch(`/values/${encodeURIComponent(TABS.tx+'!A:G')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+        method: 'POST',
+        body: JSON.stringify({ values: newTx.map(t => [t.date, t.asset, t.action, t.units, t.amount, '', '']) })
+      });
+      written.tx = newTx.length;
+      log(`✓ Transactions written.`);
+    }
+
+    for (const d of c.divMatch) {
+      log(`Writing dividend: ${d.symbol}…`);
+      await sheetsFetch(`/values/${encodeURIComponent(TABS.div + '!H' + d.rowIndex)}?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        body: JSON.stringify({ values: [[d.net]] })
+      });
+      written.divs++;
+    }
+    if (c.divMatch.length) log(`✓ ${c.divMatch.length} dividend row(s) updated.`);
+
+    for (const a of c.assetUpdate) {
+      log(`Updating NAV: ${a.fund_code}…`);
+      await sheetsFetch(`/values/${encodeURIComponent(TABS.assets + '!E' + a.rowIndex + ':F' + a.rowIndex)}?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        body: JSON.stringify({ values: [[a.nav, a.date]] })
+      });
+      written.assetsUpdated++;
+    }
+    if (c.assetUpdate.length) log(`✓ ${c.assetUpdate.length} asset NAV(s) updated.`);
+
+    if (c.assetNew.length) {
+      log(`Creating ${c.assetNew.length} new fund row(s)…`);
+      const rows = c.assetNew.map(a => [a.fund_code,'Thai Fund','','THB',a.nav,a.date,
+        'Added automatically — run Refresh All to compute cost basis','','','','','','','','','','1','','','','','']);
+      await sheetsFetch(`/values/${encodeURIComponent(TABS.assets+'!A:V')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+        method: 'POST', body: JSON.stringify({ values: rows })
+      });
+      written.assetsNew = c.assetNew.length;
+      log(`✓ New fund rows created.`);
+    }
+
+    log(`Refreshing sheet snapshot…`);
+    await fetchSheetData();
+
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultBody').innerHTML = `
+      <p>${written.tx} transaction(s), ${written.divs} dividend(s), ${written.assetsNew} new fund(s), ${written.assetsUpdated} NAV update(s) written.</p>
+      ${c.assetNew.length ? '<p class="hint" style="margin-top:8px">Open your sheet and run <b>Menu 💰 Finance &gt; Refresh All</b> to compute cost basis for the new fund(s).</p>' : ''}
+    `;
+    document.getElementById('resultCard').scrollIntoView({ behavior:'smooth' });
+    showBanner('writeBanner', 'Written successfully.', 'ok');
+
+  } catch (err) {
+    console.error(err);
+    showBanner('writeBanner', 'Write failed partway: ' + err.message + ' — already-written rows are safe; re-run to retry the rest (duplicates will be skipped).', 'err');
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('anotherBtn').addEventListener('click', function () {
+  selectedFile = null; extractedText = ''; state.parsed = null; state.changes = null;
+  fileInput.value = ''; pwInput.value = '';
+  dropZone.classList.remove('has-file');
+  document.getElementById('dropIcon').textContent = '📄';
+  document.getElementById('dropPrimary').textContent = 'Tap to choose a PDF';
+  document.getElementById('dropSecondary').textContent = 'KBank fund · SET trades · SET dividends';
+  document.getElementById('reviewBody').innerHTML = '';
+  document.getElementById('writeBtn').style.display = 'none';
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('reviewCard').classList.add('dim');
+  processBtn.disabled = true;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+</body>
+</html>
